@@ -1,0 +1,5 @@
+---
+source: lib/tests/integration.rs
+expression: output
+---
+Lines: 100.0% | Regions: 100.0% | Functions: 100.0%

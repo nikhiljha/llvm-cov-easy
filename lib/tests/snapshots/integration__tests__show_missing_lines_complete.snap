@@ -1,0 +1,6 @@
+---
+source: lib/tests/integration.rs
+expression: output
+---
+src/lib.rs:8:13-8:14 REGION hits:0
+Lines: 100.0% | Regions: 85.7% | Functions: 100.0%

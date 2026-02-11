@@ -1,0 +1,8 @@
+---
+source: lib/tests/integration.rs
+expression: output
+---
+src/lib.rs:15 UNCOVERED
+src/lib.rs:17 UNCOVERED
+src/lib.rs:8:13-8:14 REGION hits:0
+Lines: 88.2% | Regions: 69.2% | Functions: 75.0%
