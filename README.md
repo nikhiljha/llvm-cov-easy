@@ -1,32 +1,65 @@
-# agent-workspace-template
+# llvm-cov-easy
 
-A [cargo-generate](https://github.com/cargo-generate/cargo-generate) template for Rust projects optimized for AI agent workflows.
+Compact coverage gap analyzer for LLVM coverage data. Takes the verbose JSON output from [`cargo llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov) and produces ultra-compact output showing exactly which lines, regions, and branches lack coverage.
+
+Designed for AI coding agents that need to quickly understand where test coverage is missing without wasting tokens on verbose output.
+
+## Installation
+
+```bash
+cargo install --git https://github.com/nikhiljha/llvm-cov-easy
+```
+
+Requires [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov) for the `run` and `nextest` subcommands. For `nextest`, you also need [`cargo-nextest`](https://nexte.st/).
 
 ## Usage
 
-```sh
-cargo generate nikhiljha/agent-workspace-template
+### One-step (recommended)
+
+Run tests and get compact coverage output in a single command:
+
+```bash
+# Using nextest
+cargo llvm-cov-easy nextest --workspace --branch
+
+# Using cargo test
+cargo llvm-cov-easy run
 ```
 
-## Setup
+All trailing arguments are forwarded to `cargo llvm-cov`:
 
-After generating, run the setup script to install all tools and enable the pre-commit hook:
-
-```sh
-./setup.sh
+```bash
+cargo llvm-cov-easy nextest --workspace --branch --no-fail-fast
+cargo llvm-cov-easy run -- --test-threads=1
 ```
 
-## What you get
+### Two-step
 
-- Cargo workspace with a `lib` and `cli` crate
-- Clippy pedantic + nursery lints
-- `thiserror` (lib) / `anyhow` (cli) error handling
-- `tracing` instrumentation pre-wired
-- `tokio` async runtime
-- `insta` snapshot tests
-- `criterion` benchmarks
-- `cargo nextest` as the test runner
-- `cargo llvm-cov` coverage (100% enforced in CI)
-- `cargo deny` for license/vulnerability auditing
-- GitHub Actions CI
-- `CLAUDE.md` for agent discoverability
+If you already have JSON coverage output, pipe it through `analyze`:
+
+```bash
+cargo llvm-cov nextest --json --workspace --branch | cargo llvm-cov-easy analyze
+
+# Or from a file
+cargo llvm-cov-easy analyze coverage.json
+```
+
+## Output format
+
+```
+src/lib.rs:7 UNCOVERED
+src/lib.rs:8-9 UNCOVERED
+src/lib.rs:42:3-42:18 REGION hits:0
+src/lib.rs:50:5 BRANCH true:5 false:0
+Lines: 92.3% | Regions: 88.1% | Branches: 75.0% | Functions: 100.0%
+```
+
+- One line per coverage gap, consecutive uncovered lines collapsed into ranges
+- Only shows what's missing -- covered code is never shown
+- Sub-line precision for regions only when there are multiple regions on a line
+- Branch entries show true/false execution counts so you know which case is missing
+- Summary line with total coverage percentages
+
+## License
+
+MIT
