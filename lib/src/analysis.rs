@@ -327,6 +327,64 @@ mod tests {
     }
 
     #[test]
+    fn test_analyze_segments_region_entry_with_coverage() {
+        // A segment that is_region_entry=true but count > 0.
+        // This exercises the false branch of `seg.is_region_entry && seg.count == 0`
+        // at line 199. The only segment is a covered region entry, so no gaps
+        // should be reported.
+        let segments = vec![Segment {
+            line: 1,
+            col: 1,
+            count: 5,
+            has_count: true,
+            is_region_entry: true,
+            is_gap_region: false,
+        }];
+        let (line_gaps, region_gaps) = analyze_segments(&segments);
+        // Line 1 has count=5, so no uncovered lines.
+        assert!(line_gaps.is_empty());
+        // The region entry has count > 0, so no uncovered region.
+        assert!(region_gaps.is_empty());
+    }
+
+    #[test]
+    fn test_analyze_segments_uncovered_region_on_uncovered_line() {
+        // An uncovered region entry on a fully uncovered line.
+        // This exercises the true branch of `uncovered_lines.contains(&r.line_start)`
+        // at line 225, which filters out the region (already shown as UNCOVERED line).
+        let segments = vec![
+            Segment {
+                line: 5,
+                col: 1,
+                count: 0,
+                has_count: true,
+                is_region_entry: true,
+                is_gap_region: false,
+            },
+            Segment {
+                line: 5,
+                col: 20,
+                count: 0,
+                has_count: true,
+                is_region_entry: false,
+                is_gap_region: false,
+            },
+        ];
+        let (line_gaps, region_gaps) = analyze_segments(&segments);
+        // Line 5 is fully uncovered.
+        assert_eq!(line_gaps.len(), 1);
+        assert_eq!(
+            line_gaps[0],
+            CoverageGap::UncoveredLines {
+                start_line: 5,
+                end_line: 5,
+            }
+        );
+        // The region should be filtered out since the whole line is uncovered.
+        assert!(region_gaps.is_empty());
+    }
+
+    #[test]
     fn test_collapse_lines_empty() {
         let lines = BTreeSet::new();
         let gaps = collapse_lines(&lines);
