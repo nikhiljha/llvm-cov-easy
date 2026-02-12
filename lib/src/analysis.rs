@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use crate::model::{CoverageExport, FileData, Segment};
+use crate::model::{Branch, CoverageExport, FileData, Segment};
 
 /// A coverage gap found during analysis.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -140,18 +140,40 @@ fn analyze_file(file: &FileData) -> Vec<CoverageGap> {
         gaps.extend(uncovered_regions);
     }
 
-    for branch in &file.branches {
-        if branch.true_count == 0 || branch.false_count == 0 {
+    // Merge branch records across instantiations by taking the max count
+    // at each (line, col). LLVM emits separate branch records per generic
+    // monomorphization; unexecuted instantiations show true:0 false:0.
+    let merged_branches = merge_branches(&file.branches);
+    for ((line, col), (true_count, false_count)) in &merged_branches {
+        if *true_count == 0 || *false_count == 0 {
             gaps.push(CoverageGap::UncoveredBranch {
-                line: branch.line_start,
-                col: branch.col_start,
-                true_count: branch.true_count,
-                false_count: branch.false_count,
+                line: *line,
+                col: *col,
+                true_count: *true_count,
+                false_count: *false_count,
             });
         }
     }
 
     gaps
+}
+
+/// Merges branch records across generic instantiations.
+///
+/// LLVM emits separate branch records per monomorphization. When a generic
+/// function has both executed and unexecuted instantiations, the unexecuted
+/// ones show `true:0 false:0`. We merge by `(line, col)`, taking the max
+/// count for each direction, matching how `llvm-cov` computes its summary.
+fn merge_branches(branches: &[Branch]) -> BTreeMap<(u64, u64), (u64, u64)> {
+    let mut merged: BTreeMap<(u64, u64), (u64, u64)> = BTreeMap::new();
+    for branch in branches {
+        let entry = merged
+            .entry((branch.line_start, branch.col_start))
+            .or_default();
+        entry.0 = entry.0.max(branch.true_count);
+        entry.1 = entry.1.max(branch.false_count);
+    }
+    merged
 }
 
 /// Represents a region entry from a segment with its span derived from
@@ -290,6 +312,45 @@ mod tests {
                 functions_percent: 100.0,
             },
         }
+    }
+
+    fn make_branch(line: u64, col: u64, true_count: u64, false_count: u64) -> Branch {
+        Branch {
+            line_start: line,
+            col_start: col,
+            line_end: line,
+            col_end: col + 1,
+            true_count,
+            false_count,
+        }
+    }
+
+    #[test]
+    fn test_merge_branches_deduplicates_instantiations() {
+        // Two instantiations at same location: one executed, one phantom.
+        let branches = vec![make_branch(10, 5, 0, 0), make_branch(10, 5, 3, 7)];
+        let merged = merge_branches(&branches);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[&(10, 5)], (3, 7));
+    }
+
+    #[test]
+    fn test_merge_branches_keeps_uncovered() {
+        // A branch that is truly uncovered (false:0 in all instantiations).
+        let branches = vec![make_branch(20, 1, 5, 0), make_branch(20, 1, 3, 0)];
+        let merged = merge_branches(&branches);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[&(20, 1)], (5, 0));
+    }
+
+    #[test]
+    fn test_merge_branches_distinct_locations() {
+        // Branches at different locations stay separate.
+        let branches = vec![make_branch(10, 5, 1, 2), make_branch(20, 1, 3, 4)];
+        let merged = merge_branches(&branches);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[&(10, 5)], (1, 2));
+        assert_eq!(merged[&(20, 1)], (3, 4));
     }
 
     #[test]
