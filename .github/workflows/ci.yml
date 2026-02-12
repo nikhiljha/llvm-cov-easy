@@ -40,8 +40,11 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
+      - name: Install cargo-llvm-cov-easy
+        run: cargo install --git https://github.com/nikhiljha/llvm-cov-easy
+
       - name: Coverage
-        run: cargo +nightly llvm-cov nextest --workspace --branch --fail-under-lines 90 --fail-under-regions 90 --fail-under-functions 90
+        run: cargo llvm-cov-easy nextest +nightly --workspace --branch --fail-under-lines 100 --fail-under-regions 100 --fail-under-functions 100
 
       - name: Install cargo-deny
         uses: taiki-e/install-action@cargo-deny

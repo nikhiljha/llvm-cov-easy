@@ -16,7 +16,7 @@ All of these must pass in CI.
 cargo fmt --all
 cargo clippy --workspace --all-targets --fix --allow-dirty
 cargo nextest run --all --no-fail-fast
-cargo +nightly llvm-cov nextest --workspace --branch
+cargo llvm-cov-easy nextest +nightly --workspace --branch
 ```
 
 ### Testing philosophy
@@ -49,7 +49,7 @@ Testing does not end with coverage. For example, end-to-end tests are extremely 
 
 ### Coverage allow policy
 
-The goal is 100% coverage on all regions, functions, lines, and branches, but the hard gate is 90%. You should always aim for 100% but if there is really no way to cover some code then you may exclude it from coverage. You should leave a comment explaining why you can't cover it. Below is an example of coverage exclusion:
+The goal and hard gate is 100% coverage on all regions, functions, lines, and branches. You should always aim for 100% but if there is really no way to cover some code then you may exclude it from coverage. You should leave a comment explaining why you can't cover it. Below is an example of coverage exclusion:
 
 ```
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
@@ -142,9 +142,9 @@ Mocks are acceptable only when:
 This is a Cargo workspace with two crates:
 
 - `lib/` — library crate (`llvm-cov-easy`) containing core logic: JSON deserialization (`model.rs`), coverage gap analysis (`analysis.rs`), and compact output formatting (`format.rs`). Uses `serde`/`serde_json` for JSON parsing, `thiserror` for errors, and `tracing` for instrumentation.
-- `cli/` — binary crate (`cargo-llvm-cov-easy`) providing the `analyze` subcommand. Uses `clap` for argument parsing, `tokio`, `anyhow`, and `tracing-subscriber`.
+- `cli/` — binary crate (`cargo-llvm-cov-easy`) providing `analyze`, `run`, and `nextest` subcommands. Uses `clap` for argument parsing, `tokio`, `anyhow`, and `tracing-subscriber`.
 
-The CLI reads `llvm.coverage.json.export` data (from `cargo llvm-cov --json`) from a file or stdin and outputs compact, agent-friendly coverage gap information.
+The CLI can either read `llvm.coverage.json.export` data from a file or stdin (`analyze`), or shell out to `cargo llvm-cov` directly (`run`/`nextest`) and pipe the JSON through the analyzer.
 
 # Code Review Checklist
 
