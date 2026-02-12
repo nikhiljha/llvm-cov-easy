@@ -58,14 +58,15 @@ enum Commands {
 /// and the remaining args.
 fn split_toolchain(user_args: &[String]) -> (Vec<&str>, &[String]) {
     if let Some(first) = user_args.first()
-        && let Some(toolchain) = first.strip_prefix('+') {
-            let cargo_args = vec!["cargo", &user_args[0]];
-            // Validate toolchain is non-empty
-            if toolchain.is_empty() {
-                return (vec!["cargo"], user_args);
-            }
-            return (cargo_args, &user_args[1..]);
+        && let Some(toolchain) = first.strip_prefix('+')
+    {
+        let cargo_args = vec!["cargo", &user_args[0]];
+        // Validate toolchain is non-empty
+        if toolchain.is_empty() {
+            return (vec!["cargo"], user_args);
         }
+        return (cargo_args, &user_args[1..]);
+    }
     (vec!["cargo"], user_args)
 }
 
@@ -117,23 +118,18 @@ async fn main() -> anyhow::Result<()> {
 
     let cli = Cli::parse();
 
-    match cli.command {
-        Commands::Analyze { path } => {
-            let json = read_input(path)?;
-            let output = llvm_cov_easy::analyze_and_format(&json)?;
-            print!("{output}");
-        }
-        Commands::Run { args } => {
-            let json = run_cargo_llvm_cov("run", &args)?;
-            let output = llvm_cov_easy::analyze_and_format(&json)?;
-            print!("{output}");
-        }
-        Commands::Nextest { args } => {
-            let json = run_cargo_llvm_cov("nextest", &args)?;
-            let output = llvm_cov_easy::analyze_and_format(&json)?;
-            print!("{output}");
-        }
+    let json = match cli.command {
+        Commands::Analyze { path } => read_input(path)?,
+        Commands::Run { args } => run_cargo_llvm_cov("run", &args)?,
+        Commands::Nextest { args } => run_cargo_llvm_cov("nextest", &args)?,
+    };
+
+    let mut result = llvm_cov_easy::analyze_json(&json)?;
+    if let Ok(cwd) = std::env::current_dir() {
+        result.relativize_paths(&cwd);
     }
+    let output = llvm_cov_easy::format::format_result(&result);
+    print!("{output}");
 
     Ok(())
 }

@@ -4,6 +4,7 @@
 //! branches, then collapses consecutive uncovered lines into ranges.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
 
 use crate::model::{CoverageExport, FileData, Segment};
 
@@ -70,6 +71,20 @@ pub struct AnalysisResult {
     pub files: Vec<FileGaps>,
     /// Overall coverage summary.
     pub summary: CoverageSummary,
+}
+
+impl AnalysisResult {
+    /// Converts absolute file paths to paths relative to `base`.
+    ///
+    /// Paths that are not under `base` or are already relative are left
+    /// unchanged.
+    pub fn relativize_paths(&mut self, base: &Path) {
+        for file in &mut self.files {
+            if let Ok(rel) = Path::new(&file.filename).strip_prefix(base) {
+                file.filename = rel.to_string_lossy().into_owned();
+            }
+        }
+    }
 }
 
 /// Analyzes a coverage export and returns all coverage gaps.
@@ -257,6 +272,59 @@ fn collapse_lines(lines: &BTreeSet<u64>) -> Vec<CoverageGap> {
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
+
+    fn make_result(filenames: &[&str]) -> AnalysisResult {
+        AnalysisResult {
+            files: filenames
+                .iter()
+                .map(|f| FileGaps {
+                    filename: f.to_string(),
+                    gaps: vec![],
+                })
+                .collect(),
+            summary: CoverageSummary {
+                lines_percent: 100.0,
+                regions_percent: 100.0,
+                branches_percent: None,
+                functions_percent: 100.0,
+            },
+        }
+    }
+
+    #[test]
+    fn test_relativize_strips_prefix() {
+        let mut result = make_result(&["/home/user/project/src/lib.rs"]);
+        result.relativize_paths(Path::new("/home/user/project"));
+        assert_eq!(result.files[0].filename, "src/lib.rs");
+    }
+
+    #[test]
+    fn test_relativize_leaves_non_matching_paths() {
+        let mut result = make_result(&["/other/path/src/lib.rs"]);
+        result.relativize_paths(Path::new("/home/user/project"));
+        assert_eq!(result.files[0].filename, "/other/path/src/lib.rs");
+    }
+
+    #[test]
+    fn test_relativize_leaves_already_relative_paths() {
+        let mut result = make_result(&["src/lib.rs"]);
+        result.relativize_paths(Path::new("/home/user/project"));
+        assert_eq!(result.files[0].filename, "src/lib.rs");
+    }
+
+    #[test]
+    fn test_relativize_multiple_files() {
+        let mut result = make_result(&[
+            "/home/user/project/src/lib.rs",
+            "/home/user/project/src/main.rs",
+            "/other/crate/src/lib.rs",
+        ]);
+        result.relativize_paths(&PathBuf::from("/home/user/project"));
+        assert_eq!(result.files[0].filename, "src/lib.rs");
+        assert_eq!(result.files[1].filename, "src/main.rs");
+        assert_eq!(result.files[2].filename, "/other/crate/src/lib.rs");
+    }
 
     #[test]
     fn test_collapse_lines_empty() {
