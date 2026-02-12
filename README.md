@@ -19,17 +19,17 @@ Requires [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov) for the `
 Run tests and get compact coverage output in a single command:
 
 ```bash
-# Using nextest
-cargo llvm-cov-easy nextest --workspace --branch
+# Using nextest (with nightly toolchain for --branch)
+cargo llvm-cov-easy nextest +nightly --workspace --branch
 
 # Using cargo test
 cargo llvm-cov-easy run
 ```
 
-All trailing arguments are forwarded to `cargo llvm-cov`:
+Use `+toolchain` as the first argument to select a Rust toolchain (like `cargo +nightly`). All other trailing arguments are forwarded to `cargo llvm-cov`:
 
 ```bash
-cargo llvm-cov-easy nextest --workspace --branch --no-fail-fast
+cargo llvm-cov-easy nextest +nightly --workspace --branch --no-fail-fast
 cargo llvm-cov-easy run -- --test-threads=1
 ```
 

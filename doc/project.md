@@ -51,7 +51,7 @@ Design principles for output:
 
 ### `run`
 
-Runs `cargo llvm-cov run --json [args...]` and pipes the JSON output through the analyzer. All trailing arguments are forwarded to `cargo llvm-cov run`. Stderr is inherited so users see compilation progress.
+Runs `cargo llvm-cov run --json [args...]` and pipes the JSON output through the analyzer. All trailing arguments are forwarded to `cargo llvm-cov run`. Stderr is inherited so users see compilation progress. Use `+toolchain` as the first argument to select a Rust toolchain.
 
 ```
 cargo llvm-cov-easy run -- --help
@@ -59,10 +59,10 @@ cargo llvm-cov-easy run -- --help
 
 ### `nextest`
 
-Runs `cargo llvm-cov nextest --json [args...]` and pipes the JSON output through the analyzer. All trailing arguments are forwarded to `cargo llvm-cov nextest`. Stderr is inherited so users see compilation and test progress.
+Runs `cargo llvm-cov nextest --json [args...]` and pipes the JSON output through the analyzer. All trailing arguments are forwarded to `cargo llvm-cov nextest`. Stderr is inherited so users see compilation and test progress. Use `+toolchain` as the first argument to select a Rust toolchain.
 
 ```
-cargo llvm-cov-easy nextest --workspace --branch
+cargo llvm-cov-easy nextest +nightly --workspace --branch
 ```
 
 ## Reference Material

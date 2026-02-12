@@ -33,6 +33,8 @@ enum Commands {
     /// Run `cargo llvm-cov run --json` and analyze the output.
     ///
     /// All trailing arguments are forwarded to `cargo llvm-cov run`.
+    /// Use `+toolchain` (e.g. `+nightly`) as the first argument to select
+    /// a Rust toolchain.
     Run {
         /// Arguments forwarded to `cargo llvm-cov run`.
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
@@ -41,6 +43,8 @@ enum Commands {
     /// Run `cargo llvm-cov nextest --json` and analyze the output.
     ///
     /// All trailing arguments are forwarded to `cargo llvm-cov nextest`.
+    /// Use `+toolchain` (e.g. `+nightly`) as the first argument to select
+    /// a Rust toolchain.
     Nextest {
         /// Arguments forwarded to `cargo llvm-cov nextest`.
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
@@ -48,11 +52,32 @@ enum Commands {
     },
 }
 
+/// Splits a `+toolchain` prefix from the user args, if present.
+///
+/// Returns the cargo binary name (e.g. `"cargo"` or `"cargo +nightly"`)
+/// and the remaining args.
+fn split_toolchain(user_args: &[String]) -> (Vec<&str>, &[String]) {
+    if let Some(first) = user_args.first()
+        && let Some(toolchain) = first.strip_prefix('+') {
+            let cargo_args = vec!["cargo", &user_args[0]];
+            // Validate toolchain is non-empty
+            if toolchain.is_empty() {
+                return (vec!["cargo"], user_args);
+            }
+            return (cargo_args, &user_args[1..]);
+        }
+    (vec!["cargo"], user_args)
+}
+
 /// Builds the argument list for a `cargo llvm-cov` invocation.
-fn build_cargo_llvm_cov_args<'a>(subcommand: &'a str, user_args: &'a [String]) -> Vec<&'a str> {
+fn build_cargo_llvm_cov_args<'a>(
+    subcommand: &'a str,
+    user_args: &'a [String],
+) -> (Vec<&'a str>, Vec<&'a str>) {
+    let (cargo_args, remaining) = split_toolchain(user_args);
     let mut args = vec!["llvm-cov", subcommand, "--json"];
-    args.extend(user_args.iter().map(String::as_str));
-    args
+    args.extend(remaining.iter().map(String::as_str));
+    (cargo_args, args)
 }
 
 /// Runs `cargo llvm-cov <subcommand> --json [args...]` and returns its stdout.
@@ -63,18 +88,20 @@ fn build_cargo_llvm_cov_args<'a>(subcommand: &'a str, user_args: &'a [String]) -
 /// which requires the full toolchain and is tested via E2E tests.
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn run_cargo_llvm_cov(subcommand: &str, user_args: &[String]) -> anyhow::Result<String> {
-    let args = build_cargo_llvm_cov_args(subcommand, user_args);
+    let (cargo_args, llvm_cov_args) = build_cargo_llvm_cov_args(subcommand, user_args);
 
-    let output = Command::new("cargo")
-        .args(&args)
+    let output = Command::new(cargo_args[0])
+        .args(&cargo_args[1..])
+        .args(&llvm_cov_args)
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .output()?;
 
     if !output.status.success() {
         anyhow::bail!(
-            "cargo {} exited with status {}",
-            args.join(" "),
+            "{} {} exited with status {}",
+            cargo_args.join(" "),
+            llvm_cov_args.join(" "),
             output.status
         );
     }
@@ -131,10 +158,43 @@ mod tests {
     use super::*;
 
     #[test]
+    fn split_toolchain_with_nightly() {
+        let args = vec!["+nightly".to_string(), "--workspace".to_string()];
+        let (cargo, rest) = split_toolchain(&args);
+        assert_eq!(cargo, vec!["cargo", "+nightly"]);
+        assert_eq!(rest, &[String::from("--workspace")]);
+    }
+
+    #[test]
+    fn split_toolchain_without_toolchain() {
+        let args = vec!["--workspace".to_string()];
+        let (cargo, rest) = split_toolchain(&args);
+        assert_eq!(cargo, vec!["cargo"]);
+        assert_eq!(rest, &args[..]);
+    }
+
+    #[test]
+    fn split_toolchain_empty_args() {
+        let args: Vec<String> = vec![];
+        let (cargo, rest) = split_toolchain(&args);
+        assert_eq!(cargo, vec!["cargo"]);
+        assert!(rest.is_empty());
+    }
+
+    #[test]
+    fn split_toolchain_bare_plus() {
+        let args = vec!["+".to_string(), "--workspace".to_string()];
+        let (cargo, rest) = split_toolchain(&args);
+        assert_eq!(cargo, vec!["cargo"]);
+        assert_eq!(rest, &args[..]);
+    }
+
+    #[test]
     fn build_args_no_user_args() {
         let user_args: Vec<String> = vec![];
-        let result = build_cargo_llvm_cov_args("nextest", &user_args);
-        assert_eq!(result, vec!["llvm-cov", "nextest", "--json"]);
+        let (cargo, llvm_args) = build_cargo_llvm_cov_args("nextest", &user_args);
+        assert_eq!(cargo, vec!["cargo"]);
+        assert_eq!(llvm_args, vec!["llvm-cov", "nextest", "--json"]);
     }
 
     #[test]
@@ -144,9 +204,10 @@ mod tests {
             "--branch".to_string(),
             "--no-fail-fast".to_string(),
         ];
-        let result = build_cargo_llvm_cov_args("nextest", &user_args);
+        let (cargo, llvm_args) = build_cargo_llvm_cov_args("nextest", &user_args);
+        assert_eq!(cargo, vec!["cargo"]);
         assert_eq!(
-            result,
+            llvm_args,
             vec![
                 "llvm-cov",
                 "nextest",
@@ -161,7 +222,23 @@ mod tests {
     #[test]
     fn build_args_run_subcommand() {
         let user_args = vec!["--".to_string(), "--help".to_string()];
-        let result = build_cargo_llvm_cov_args("run", &user_args);
-        assert_eq!(result, vec!["llvm-cov", "run", "--json", "--", "--help"]);
+        let (cargo, llvm_args) = build_cargo_llvm_cov_args("run", &user_args);
+        assert_eq!(cargo, vec!["cargo"]);
+        assert_eq!(llvm_args, vec!["llvm-cov", "run", "--json", "--", "--help"]);
+    }
+
+    #[test]
+    fn build_args_with_toolchain() {
+        let user_args = vec![
+            "+nightly".to_string(),
+            "--workspace".to_string(),
+            "--branch".to_string(),
+        ];
+        let (cargo, llvm_args) = build_cargo_llvm_cov_args("nextest", &user_args);
+        assert_eq!(cargo, vec!["cargo", "+nightly"]);
+        assert_eq!(
+            llvm_args,
+            vec!["llvm-cov", "nextest", "--json", "--workspace", "--branch"]
+        );
     }
 }
