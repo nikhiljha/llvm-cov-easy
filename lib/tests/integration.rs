@@ -78,4 +78,28 @@ mod tests {
         let output = llvm_cov_easy::analyze_and_format(json).unwrap();
         assert_snapshot!(output);
     }
+
+    #[test]
+    fn test_malformed_segment() {
+        // Segment array has wrong number of elements — triggers Segment::deserialize error path
+        let json = r#"{"data":[{"files":[{"filename":"src/lib.rs","segments":[[1,1,0]],"summary":{"lines":{"count":1,"covered":0,"percent":0.0},"regions":{"count":1,"covered":0,"percent":0.0},"functions":{"count":1,"covered":0,"percent":0.0}}}],"totals":{"lines":{"count":1,"covered":0,"percent":0.0},"regions":{"count":1,"covered":0,"percent":0.0},"functions":{"count":1,"covered":0,"percent":0.0}}}],"type":"llvm.coverage.json.export","version":"2.0.1"}"#;
+        let result = llvm_cov_easy::analyze_and_format(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_malformed_branch() {
+        // Branch array has wrong number of elements — triggers Branch::deserialize error path
+        let json = r#"{"data":[{"files":[{"filename":"src/lib.rs","segments":[],"branches":[[1,1]],"summary":{"lines":{"count":1,"covered":0,"percent":0.0},"regions":{"count":1,"covered":0,"percent":0.0},"functions":{"count":1,"covered":0,"percent":0.0}}}],"totals":{"lines":{"count":1,"covered":0,"percent":0.0},"regions":{"count":1,"covered":0,"percent":0.0},"functions":{"count":1,"covered":0,"percent":0.0}}}],"type":"llvm.coverage.json.export","version":"2.0.1"}"#;
+        let result = llvm_cov_easy::analyze_and_format(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_malformed_region() {
+        // Region array has wrong number of elements — triggers Region::deserialize error path
+        let json = r#"{"data":[{"files":[{"filename":"src/lib.rs","segments":[],"summary":{"lines":{"count":1,"covered":0,"percent":0.0},"regions":{"count":1,"covered":0,"percent":0.0},"functions":{"count":1,"covered":0,"percent":0.0}}}],"functions":[{"name":"foo","count":1,"filenames":["src/lib.rs"],"regions":[[1,1]],"branches":[]}],"totals":{"lines":{"count":1,"covered":0,"percent":0.0},"regions":{"count":1,"covered":0,"percent":0.0},"functions":{"count":1,"covered":0,"percent":0.0}}}],"type":"llvm.coverage.json.export","version":"2.0.1"}"#;
+        let result = llvm_cov_easy::analyze_and_format(json);
+        assert!(result.is_err());
+    }
 }

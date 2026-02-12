@@ -6,17 +6,29 @@ use std::process::{Command, Stdio};
 
 use clap::{Parser, Subcommand};
 
-/// Compact coverage gap analyzer for LLVM coverage data.
-///
-/// Takes the JSON output from `cargo llvm-cov --json` and produces
-/// ultra-compact, agent-friendly output showing exactly which lines,
-/// regions, and branches lack coverage.
+/// Cargo wrapper for compact LLVM coverage output.
 #[derive(Parser)]
-#[command(version, about)]
-struct Cli {
-    /// Subcommand to execute.
+#[command(name = "cargo", bin_name = "cargo", version, about)]
+struct Cargo {
+    /// Subcommand dispatched by cargo.
     #[command(subcommand)]
-    command: Commands,
+    command: CargoCommand,
+}
+
+/// Top-level cargo subcommand.
+#[derive(Subcommand)]
+enum CargoCommand {
+    /// Compact coverage gap analyzer for LLVM coverage data.
+    ///
+    /// Takes the JSON output from `cargo llvm-cov --json` and produces
+    /// ultra-compact, agent-friendly output showing exactly which lines,
+    /// regions, and branches lack coverage.
+    #[command(name = "llvm-cov-easy")]
+    LlvmCovEasy {
+        /// Subcommand to execute.
+        #[command(subcommand)]
+        command: Commands,
+    },
 }
 
 /// Available subcommands.
@@ -54,18 +66,17 @@ enum Commands {
 
 /// Splits a `+toolchain` prefix from the user args, if present.
 ///
-/// Returns the cargo binary name (e.g. `"cargo"` or `"cargo +nightly"`)
+/// Returns the cargo args (e.g. `["cargo"]` or `["cargo", "+nightly"]`)
 /// and the remaining args.
 fn split_toolchain(user_args: &[String]) -> (Vec<&str>, &[String]) {
     if let Some(first) = user_args.first()
         && let Some(toolchain) = first.strip_prefix('+')
     {
-        let cargo_args = vec!["cargo", &user_args[0]];
         // Validate toolchain is non-empty
         if toolchain.is_empty() {
             return (vec!["cargo"], user_args);
         }
-        return (cargo_args, &user_args[1..]);
+        return (vec!["cargo", &user_args[0]], &user_args[1..]);
     }
     (vec!["cargo"], user_args)
 }
@@ -116,9 +127,11 @@ fn run_cargo_llvm_cov(subcommand: &str, user_args: &[String]) -> anyhow::Result<
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let cli = Cli::parse();
+    let Cargo {
+        command: CargoCommand::LlvmCovEasy { command },
+    } = Cargo::parse();
 
-    let json = match cli.command {
+    let json = match command {
         Commands::Analyze { path } => read_input(path)?,
         Commands::Run { args } => run_cargo_llvm_cov("run", &args)?,
         Commands::Nextest { args } => run_cargo_llvm_cov("nextest", &args)?,
