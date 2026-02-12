@@ -49,9 +49,21 @@ Design principles for output:
 - No color codes, no decorations, no headers unless a summary is requested
 - Summary line at the end with total coverage percentages for lines, regions, branches, and functions
 
-### Reserved: base command (future)
+### `run`
 
-The base command (no subcommand) is reserved for a future wrapper that will invoke `cargo llvm-cov` itself and then analyze the output. Not in scope now.
+Runs `cargo llvm-cov run --json [args...]` and pipes the JSON output through the analyzer. All trailing arguments are forwarded to `cargo llvm-cov run`. Stderr is inherited so users see compilation progress.
+
+```
+cargo llvm-cov-easy run -- --help
+```
+
+### `nextest`
+
+Runs `cargo llvm-cov nextest --json [args...]` and pipes the JSON output through the analyzer. All trailing arguments are forwarded to `cargo llvm-cov nextest`. Stderr is inherited so users see compilation and test progress.
+
+```
+cargo llvm-cov-easy nextest --workspace --branch
+```
 
 ## Reference Material
 
