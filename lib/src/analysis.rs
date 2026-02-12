@@ -81,7 +81,7 @@ impl AnalysisResult {
     pub fn relativize_paths(&mut self, base: &Path) {
         for file in &mut self.files {
             if let Ok(rel) = Path::new(&file.filename).strip_prefix(base) {
-                file.filename = rel.to_string_lossy().into_owned();
+                file.filename = format!("./{}", rel.to_string_lossy());
             }
         }
     }
@@ -296,7 +296,7 @@ mod tests {
     fn test_relativize_strips_prefix() {
         let mut result = make_result(&["/home/user/project/src/lib.rs"]);
         result.relativize_paths(Path::new("/home/user/project"));
-        assert_eq!(result.files[0].filename, "src/lib.rs");
+        assert_eq!(result.files[0].filename, "./src/lib.rs");
     }
 
     #[test]
@@ -321,8 +321,8 @@ mod tests {
             "/other/crate/src/lib.rs",
         ]);
         result.relativize_paths(&PathBuf::from("/home/user/project"));
-        assert_eq!(result.files[0].filename, "src/lib.rs");
-        assert_eq!(result.files[1].filename, "src/main.rs");
+        assert_eq!(result.files[0].filename, "./src/lib.rs");
+        assert_eq!(result.files[1].filename, "./src/main.rs");
         assert_eq!(result.files[2].filename, "/other/crate/src/lib.rs");
     }
 

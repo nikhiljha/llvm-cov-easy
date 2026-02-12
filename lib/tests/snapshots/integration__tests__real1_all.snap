@@ -2,4 +2,7 @@
 source: lib/tests/integration.rs
 expression: output
 ---
+# Code Coverage
+
+## Coverage Summary
 Lines: 70.4% | Regions: 70.4% | Functions: 100.0%

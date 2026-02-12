@@ -2,7 +2,12 @@
 source: lib/tests/integration.rs
 expression: output
 ---
+# Code Coverage
+
+## Missed Coverage Areas
 src/lib.rs:5:20-5:21 REGION hits:0
 src/lib.rs:5:5 BRANCH true:3 false:0
 src/lib.rs:10:9 BRANCH true:0 false:7
+
+## Coverage Summary
 Lines: 83.3% | Regions: 83.3% | Branches: 66.7% | Functions: 100.0%

@@ -6,26 +6,36 @@ use std::fmt::Write;
 
 use crate::analysis::{AnalysisResult, CoverageGap, CoverageSummary};
 
-/// Formats an analysis result as compact, agent-friendly text.
+/// Formats an analysis result as compact, agent-friendly markdown.
 ///
 /// Output format:
 /// ```text
-/// src/lib.rs:7 UNCOVERED
-/// src/lib.rs:8-9 UNCOVERED
-/// src/lib.rs:42:3-42:18 REGION hits:0
-/// src/lib.rs:50:5 BRANCH true:5 false:0
+/// # Code Coverage
+///
+/// ## Missed Coverage Areas
+/// ./src/lib.rs:7 UNCOVERED
+/// ./src/lib.rs:8-9 UNCOVERED
+/// ./src/lib.rs:42:3-42:18 REGION hits:0
+/// ./src/lib.rs:50:5 BRANCH true:5 false:0
+///
+/// ## Coverage Summary
 /// Lines: 92.3% | Regions: 88.1% | Branches: 75.0% | Functions: 100.0%
 /// ```
 #[must_use]
 pub fn format_result(result: &AnalysisResult) -> String {
-    let mut output = String::new();
+    let mut output = String::from("# Code Coverage\n");
+    let has_gaps = result.files.iter().any(|f| !f.gaps.is_empty());
 
-    for file in &result.files {
-        for gap in &file.gaps {
-            format_gap(&mut output, &file.filename, gap);
+    if has_gaps {
+        output.push_str("\n## Missed Coverage Areas\n");
+        for file in &result.files {
+            for gap in &file.gaps {
+                format_gap(&mut output, &file.filename, gap);
+            }
         }
     }
 
+    output.push_str("\n## Coverage Summary\n");
     format_summary(&mut output, &result.summary);
     output
 }
@@ -169,6 +179,23 @@ mod tests {
         let output = format_result(&result);
         assert!(output.contains("src/lib.rs:50:5 BRANCH true:5 false:0"));
         assert!(output.contains("Branches: 75.0%"));
+    }
+
+    #[test]
+    fn test_format_no_gaps_omits_missed_section() {
+        let result = AnalysisResult {
+            files: vec![],
+            summary: CoverageSummary {
+                lines_percent: 100.0,
+                regions_percent: 100.0,
+                branches_percent: None,
+                functions_percent: 100.0,
+            },
+        };
+        let output = format_result(&result);
+        assert!(!output.contains("## Missed Coverage Areas"));
+        assert!(output.contains("# Code Coverage"));
+        assert!(output.contains("## Coverage Summary"));
     }
 
     #[test]
